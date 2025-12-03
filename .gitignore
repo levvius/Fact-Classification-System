@@ -213,3 +213,7 @@ models/
 
 # Temporary files
 /tmp/
+
+# Backup files
+*.backup
+requirements.txt.backup

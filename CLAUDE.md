@@ -80,6 +80,13 @@ See [Testing Infrastructure](#testing-infrastructure) section below for running 
 - First request after startup will be slow (~5-10s) while models initialize
 - Subsequent requests fast (models cached in memory)
 
+### Python Version
+
+- **Recommended**: Python 3.13.1 (installed via pyenv)
+- **Supported**: Python 3.9-3.13
+- **Not supported**: Python 3.14 (transformers incompatibility)
+- **Migration**: Completed in Фаза 11 (3.14 → 3.13.1)
+
 ### Project Structure
 ```
 app/
@@ -166,7 +173,7 @@ pytest tests/unit --cov=app --cov-report=html
 
 XSS protection in `app/api/schemas.py`:
 - 10 dangerous patterns detected: `<script>`, `javascript:`, `onerror=`, etc.
-- Minimum text length: 3 words
+- **Minimum text length: 10 characters** (approximately 3 words)
 - ValidationError (422) on XSS attempt
 
 ### Caching
@@ -177,6 +184,14 @@ XSS protection in `app/api/schemas.py`:
 - Key: MD5 hash of input text
 - Location: `app/core/cache.py`
 - Endpoint: `/cache-info` for cache statistics
+
+### Additional Endpoints
+
+- **GET /cache-info** - Returns cache statistics (size, maxsize)
+  ```bash
+  curl http://localhost:8000/cache-info
+  # Returns: {"size": 15, "maxsize": 100}
+  ```
 
 ## Historical Context
 

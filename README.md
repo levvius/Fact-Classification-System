@@ -131,6 +131,61 @@ curl "http://localhost:8000/api/v1/health"
 }
 ```
 
+### Cache Statistics
+
+**Endpoint:** `GET /cache-info`
+
+```bash
+curl "http://localhost:8000/cache-info"
+```
+
+**Ответ:**
+```json
+{
+  "size": 15,
+  "maxsize": 100
+}
+```
+
+## Security Features
+
+### Rate Limiting
+
+API endpoints are protected with rate limiting to prevent abuse:
+- **Library**: slowapi (token bucket algorithm)
+- **Default limit**: 10 requests per minute per IP
+- **Burst allowance**: 3 additional requests
+- **Applies to**: All `/api/v1/*` endpoints
+- **Configuration**: `app/core/config.py` (RATE_LIMIT_REQUESTS, RATE_LIMIT_BURST)
+
+### Input Validation
+
+XSS protection in `app/api/schemas.py`:
+- Detects 10 dangerous patterns: `<script>`, `javascript:`, `onerror=`, `onclick=`, `<iframe>`, `<object>`, `<embed>`, `eval()`, `document.cookie`, `window.location`
+- Minimum text length: 10 characters (approximately 3 words)
+- Returns **422 Validation Error** on XSS attempt
+
+### Exception Handling
+
+8 custom exceptions in `app/core/exceptions.py`:
+- `ModelNotLoadedException` - Models not loaded (503)
+- `KnowledgeBaseException` - KB not found (503)
+- `ClaimExtractionException` - Claim extraction failed (500)
+- `EvidenceRetrievalException` - Evidence retrieval failed (500)
+- `NLIVerificationException` - NLI verification failed (500)
+- `ClassificationException` - Classification failed (500)
+- `CacheException` - Cache operation failed (500)
+
+### Caching
+
+Response caching for improved performance:
+- **Library**: cachetools.TTLCache
+- **TTL**: 5 minutes
+- **Max size**: 100 entries
+- **Key**: MD5 hash of input text
+- **Implementation**: `app/core/cache.py`
+- **Cache info endpoint**: `GET /cache-info` for statistics
+
 ## Testing
 
 This project includes comprehensive test coverage with unit and integration tests.
@@ -215,11 +270,15 @@ IS-hallucination-detection/
 
 ## Технологии
 
-- **FastAPI** - веб-фреймворк для API
-- **sentence-transformers** (all-MiniLM-L6-v2) - векторные представления текста
-- **transformers** (roberta-large-mnli) - NLI модель для верификации
-- **FAISS** - векторный поиск
-- **Wikipedia API** - база знаний
+- **FastAPI** (0.123.5) - веб-фреймворк для API
+- **sentence-transformers** (3.4.1, all-MiniLM-L6-v2) - векторные представления текста
+- **transformers** (4.57.3, roberta-large-mnli) - NLI модель для верификации
+- **FAISS** (1.13.0) - векторный поиск
+- **Wikipedia API** (1.4.0) - база знаний
+- **NumPy** (2.3.5) - математические операции
+- **PyTorch** (2.9.1) - deep learning framework
+- **slowapi** (0.1.9) - rate limiting
+- **cachetools** (6.2.2) - response caching
 
 ## Лицензия
 
