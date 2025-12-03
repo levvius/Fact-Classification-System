@@ -97,3 +97,47 @@ async def health_check():
 async def cache_info_endpoint():
     """Get cache statistics (for debugging)."""
     return get_cache_info()
+
+
+@router.get("/topics")
+async def get_topics():
+    """
+    Get available Wikipedia topics in the knowledge base.
+
+    Returns topics grouped by category for better UX.
+
+    Returns:
+        Dict with total_topics count and categorized topic lists
+    """
+    from app.utils.wikipedia_kb import SEED_TOPICS
+
+    categories = {
+        "People": ["Albert Einstein", "Barack Obama"],
+        "Technology": [
+            "Python (programming language)",
+            "Artificial intelligence",
+            "Machine learning",
+            "Neural network",
+            "Data science",
+            "Linux",
+            "Microsoft",
+            "Google",
+            "Tesla, Inc.",
+            "Amazon (company)"
+        ],
+        "Science": [
+            "Quantum mechanics",
+            "Climate change",
+            "COVID-19"
+        ],
+        "History & Geography": [
+            "World War II",
+            "New York City",
+            "Mount Everest"
+        ]
+    }
+
+    return {
+        "total_topics": len(SEED_TOPICS),
+        "categories": categories
+    }
