@@ -1,9 +1,11 @@
 import json
 import logging
+import os
 from typing import List, Dict, Optional
 from sentence_transformers import SentenceTransformer
 from transformers import pipeline
 import faiss
+import torch
 
 from app.core.config import settings
 from app.core.exceptions import ModelNotLoadedException, KnowledgeBaseException
@@ -42,10 +44,20 @@ class ModelManager:
 
         logger.info("Loading models...")
 
+        # CRITICAL: Single-threaded mode to prevent threading crashes on macOS
+        torch.set_num_threads(1)  # Only 1 thread!
+        torch.set_num_interop_threads(1)
+        os.environ["OMP_NUM_THREADS"] = "1"
+        os.environ["MKL_NUM_THREADS"] = "1"
+        os.environ["OPENBLAS_NUM_THREADS"] = "1"
+        os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
+        os.environ["NUMEXPR_NUM_THREADS"] = "1"
+        logger.info("PyTorch threads limited to 1 (single-threaded mode for stability)")
+
         try:
             # Load embedding model
-            logger.info(f"Loading embedding model: {settings.embedding_model}")
-            self._embed_model = SentenceTransformer(settings.embedding_model)
+            logger.info(f"Loading embedding model: {settings.embedding_model} (device=cpu)")
+            self._embed_model = SentenceTransformer(settings.embedding_model, device='cpu')
 
             # Load NLI pipeline
             logger.info(f"Loading NLI model: {settings.nli_model}")

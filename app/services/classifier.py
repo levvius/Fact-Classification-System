@@ -1,10 +1,13 @@
 from typing import Dict, List, Optional
+import logging
 
 from app.services.claim_extractor import extract_claims
 from app.services.evidence_retriever import retrieve_proofs
 from app.services.nli_verifier import nli_score
 from app.core.config import settings
 from app.core.exceptions import ClassificationException
+
+logger = logging.getLogger(__name__)
 
 
 def assess_claim(claim: str, top_k: int = None) -> Dict:
@@ -65,13 +68,30 @@ def classify_text(text: str) -> Dict:
     Raises:
         ClassificationException: If classification fails
     """
+    import sys
     try:
         # Extract claims
+        logger.info("STEP 1: Starting claim extraction...")
+        sys.stdout.flush()
+
         claims = extract_claims(text)
+        logger.info(f"STEP 1: ✓ Extracted {len(claims)} claims")
+        sys.stdout.flush()
+
+        # Limit claims if needed
+        if len(claims) > settings.max_claims:
+            logger.info(f"STEP 2: Limiting to {settings.max_claims} claims")
+            claims = claims[:settings.max_claims]
+            sys.stdout.flush()
 
         # Assess each claim
+        logger.info("STEP 3: Starting claim assessment...")
+        sys.stdout.flush()
+
         claim_results = []
-        for claim_text in claims:
+        for i, claim_text in enumerate(claims, 1):
+            logger.info(f"STEP 3.{i}: Assessing claim: {claim_text[:50]}...")
+            sys.stdout.flush()
             result = assess_claim(claim_text)
 
             # Map support score to classification
@@ -98,7 +118,12 @@ def classify_text(text: str) -> Dict:
                 } if result["best_proof"] else None
             })
 
+            logger.info(f"STEP 3.{i}: ✓ {classification} (support: {support:.2f})")
+            sys.stdout.flush()
+
         # Overall classification aggregation
+        logger.info("STEP 4: Aggregating results...")
+        sys.stdout.flush()
         # Priority: if any "неправда" -> overall "неправда"
         #           elif any "нейтрально" -> overall "нейтрально"
         #           else -> overall "правда"
@@ -123,6 +148,9 @@ def classify_text(text: str) -> Dict:
             overall = "правда"
             # Average confidence of truth claims
             overall_confidence = sum(confidences) / len(confidences) if confidences else 0.0
+
+        logger.info(f"STEP 4: ✓ Overall: {overall} (confidence: {overall_confidence:.2f})")
+        sys.stdout.flush()
 
         return {
             "overall_classification": overall,

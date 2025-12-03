@@ -2,6 +2,8 @@ from fastapi import APIRouter, HTTPException, Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 import logging
+from concurrent.futures import ThreadPoolExecutor
+import asyncio
 
 from app.api.schemas import (
     ClassifyRequest,
@@ -20,6 +22,9 @@ router = APIRouter()
 # Initialize limiter
 limiter = Limiter(key_func=get_remote_address)
 
+# Dedicated thread pool for ML operations (prevents event loop blocking)
+ml_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="ml-worker")
+
 
 @router.post("/classify", response_model=ClassifyResponse)
 @limiter.limit("10/minute")
@@ -37,24 +42,59 @@ async def classify_endpoint(request: Request, classify_req: ClassifyRequest):
     Returns:
         ClassifyResponse with overall classification, confidence, and claim analysis
     """
+    import sys
+
+    # Log with flush for crash debugging
+    logger.info("=" * 60)
+    logger.info(f"📝 CLASSIFY REQUEST START")
+    logger.info(f"   Text length: {len(classify_req.text)} chars")
+    logger.info(f"   Preview: {classify_req.text[:100]}...")
+    sys.stdout.flush()
+
     try:
         # Check cache
         cached = get_cached_result(classify_req.text)
         if cached:
-            logger.info("Cache hit - returning cached result")
+            logger.info("✓ Cache hit")
+            sys.stdout.flush()
             return cached
 
-        # Classify text
-        logger.info(f"Classifying text ({len(classify_req.text)} chars)")
-        result = classify_text(classify_req.text)
+        # Run blocking ML in separate thread to avoid blocking event loop
+        logger.info("🔍 Starting classification in worker thread...")
+        sys.stdout.flush()
+
+        loop = asyncio.get_event_loop()
+
+        # Add timeout protection
+        try:
+            result = await asyncio.wait_for(
+                loop.run_in_executor(ml_executor, classify_text, classify_req.text),
+                timeout=45.0  # 45 second timeout
+            )
+        except asyncio.TimeoutError:
+            logger.error("❌ Classification timed out after 45 seconds")
+            sys.stdout.flush()
+            raise ClassificationException(
+                "Classification timed out. The text might be too complex or the server is overloaded.",
+                details={"timeout": 45, "text_length": len(classify_req.text)}
+            )
+
+        logger.info(f"✓ Classification complete: {result['overall_classification']}")
+        sys.stdout.flush()
 
         # Cache result
         cache_result(classify_req.text, result)
 
+        logger.info("✅ REQUEST COMPLETE")
+        logger.info("=" * 60)
+        sys.stdout.flush()
+
         return result
 
     except Exception as e:
-        logger.error(f"Classification failed: {str(e)}", exc_info=True)
+        logger.error(f"❌ CLASSIFICATION FAILED: {str(e)}", exc_info=True)
+        sys.stdout.flush()
+        sys.stderr.flush()
         raise ClassificationException(
             f"Failed to classify text: {str(e)}",
             details={"error_type": type(e).__name__}

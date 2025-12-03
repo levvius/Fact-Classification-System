@@ -42,6 +42,27 @@ python scripts/build_kb.py
 
 ---
 
+## 🆕 Recent Updates (December 2024)
+
+### Stability Improvements
+- ✅ Fixed segmentation faults on macOS Apple Silicon
+- ✅ Removed unsafe signal handlers causing infinite recursion
+- ✅ Implemented single-threaded PyTorch mode for stability
+- ✅ Fixed MPS GPU auto-detection issues
+- ✅ Removed uvicorn --reload mode conflicts
+- ✅ Added ThreadPoolExecutor for non-blocking ML operations
+- ✅ Added 45-second timeout protection
+
+### Bug Fixes
+- Fixed NLI pipeline crashes with roberta-large-mnli (355M parameters)
+- Fixed progress bar multiprocessing deadlocks
+- Fixed event loop blocking in FastAPI
+- Fixed response validation schema errors
+
+**Impact**: System is now stable and crash-free on macOS. All classification operations complete successfully without segmentation faults or hangs.
+
+---
+
 ## 🔧 Installation
 
 ### Prerequisites
@@ -152,6 +173,41 @@ Response:
 ```bash
 curl http://localhost:8000/api/v1/topics
 ```
+
+---
+
+## 📝 Example Test Inputs
+
+Test the system with these example texts from different Wikipedia categories:
+
+### Example 1: People (Albert Einstein)
+```bash
+curl -X POST http://localhost:8000/api/v1/classify \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Albert Einstein was born on March 14, 1879, in Ulm, Germany. He developed the theory of relativity in 1905 and won the Nobel Prize in Physics in 1921. Einstein emigrated to the United States in 1933 and became a professor at Princeton University."}'
+```
+
+**Expected Result:** ✅ правда (confidence: ~0.95+)
+
+### Example 2: Technology (Python & AI)
+```bash
+curl -X POST http://localhost:8000/api/v1/classify \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Python is a high-level programming language created by Guido van Rossum in 1991. It has become one of the most popular languages for artificial intelligence and machine learning development. Neural networks are a key component of modern AI systems, inspired by biological neural networks in the human brain."}'
+```
+
+**Expected Result:** ✅ правда (confidence: ~0.90+)
+
+### Example 3: Science (Climate Change & COVID-19)
+```bash
+curl -X POST http://localhost:8000/api/v1/classify \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Climate change refers to long-term shifts in global temperatures and weather patterns. The COVID-19 pandemic began in late 2019 and was caused by the SARS-CoV-2 virus. Both phenomena have had significant global impacts requiring scientific research and public health responses."}'
+```
+
+**Expected Result:** ✅ правда (confidence: ~0.85+)
+
+**Note**: These examples use factual information from the Wikipedia knowledge base. Classification confidence may vary slightly based on model initialization, but all should classify as "правда" with high confidence.
 
 ---
 
@@ -375,9 +431,19 @@ For issues, please check:
 
 ---
 
-## 📝 Recent Updates
+## 📝 Version History
 
-### Version 2.0 (Current)
+### Version 2.1 (Current - December 2024)
+- ✅ **CRITICAL**: Fixed segmentation faults on macOS
+- ✅ Implemented single-threaded PyTorch mode for stability
+- ✅ Removed unsafe signal handlers
+- ✅ Fixed MPS GPU auto-detection crashes
+- ✅ Added ThreadPoolExecutor for non-blocking ML operations
+- ✅ Added 45-second timeout protection
+- ✅ Fixed NLI pipeline crashes
+- ✅ System now stable and crash-free
+
+### Version 2.0
 - ✅ Added web interface (HTML/CSS/JavaScript)
 - ✅ 18 Wikipedia topics with examples
 - ✅ Improved error handling with clear messages

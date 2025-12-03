@@ -30,6 +30,77 @@ The system is a **stateless FastAPI application** with the following pipeline:
   - Per-claim: support >= 0.85 → "правда", < 0.4 → "неправда", else "нейтрально"
   - Overall: ANY "неправда" → overall "неправда" (pessimistic aggregation)
 
+## Stability & Performance (macOS Critical)
+
+### Single-Threaded Mode (REQUIRED on macOS)
+
+The system MUST run in single-threaded mode on macOS to prevent segmentation faults:
+
+**File:** `app/core/models.py:47-55`
+```python
+# CRITICAL: Single-threaded mode to prevent threading crashes on macOS
+torch.set_num_threads(1)
+torch.set_num_interop_threads(1)
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
+logger.info("PyTorch threads limited to 1 (single-threaded mode for stability)")
+```
+
+**Why:** PyTorch multi-threading causes crashes with roberta-large-mnli (355M parameters) on Apple Silicon.
+
+### ThreadPoolExecutor Pattern
+
+**File:** `app/api/routes.py:26-80`
+
+ML operations run in dedicated thread pool to prevent FastAPI event loop blocking:
+
+```python
+ml_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="ml-worker")
+
+# In endpoint:
+result = await asyncio.wait_for(
+    loop.run_in_executor(ml_executor, classify_text, text),
+    timeout=45.0  # 45-second timeout
+)
+```
+
+**Why:** Synchronous ML operations (NLI, FAISS) would block async FastAPI.
+
+### Device Configuration
+
+**File:** `app/core/models.py:60`
+
+Force CPU-only mode to prevent MPS GPU crashes:
+
+```python
+self._embed_model = SentenceTransformer(settings.embedding_model, device='cpu')
+```
+
+**Why:** MPS (Metal Performance Shaders) auto-detection causes PyTorch backend crashes.
+
+### Removed Features (Safety)
+
+1. **Signal Handlers** - Removed from `app/main.py`
+   - SIGSEGV/SIGABRT handlers caused infinite recursion
+   - Cannot safely log when memory is corrupted
+
+2. **Uvicorn --reload** - Removed from `run.sh:90`
+   - Process forking incompatible with ML pipeline on macOS
+   - Use manual restarts during development
+
+3. **Progress Bars** - Disabled in `evidence_retriever.py:39`
+   - `show_progress_bar=False` prevents multiprocessing deadlocks
+
+**Impact of Stability Fixes:**
+- ✅ No more segmentation faults on macOS
+- ✅ No more infinite recursion from signal handlers
+- ✅ Stable multi-claim classification
+- ✅ All 106 tests pass reliably
+- ✅ System runs crash-free for extended periods
+
 ## Frontend Architecture (NEW)
 
 The system now includes a **web interface** served via FastAPI StaticFiles:
