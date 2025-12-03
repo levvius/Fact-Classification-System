@@ -1,128 +1,117 @@
-# IS-hallucination-detection
+# Fact Classification System
 
-REST API для классификации текста на английском языке как "правда" (truth), "неправда" (falsehood) или "нейтрально" (neutral) с использованием NLI (Natural Language Inference) и проверки фактов через Wikipedia.
+REST API для классификации английского текста как "правда", "неправда" или "нейтрально" с использованием NLI (Natural Language Inference) и Wikipedia.
 
-Репозиторий для курса "Технологии проектирования и сопровождения информационных систем".
+## 🚀 Quick Start
 
-## Описание
-
-Приложение анализирует английский текст, извлекает из него утверждения (claims), проверяет их с помощью базы знаний Wikipedia и NLI-модели, и возвращает классификацию для каждого утверждения и всего текста в целом.
-
-### Как это работает
-
-1. **Извлечение утверждений** - текст разбивается на предложения, из которых выбираются фактические утверждения
-2. **Поиск доказательств** - для каждого утверждения ищутся релевантные фрагменты из Wikipedia через FAISS векторный поиск
-3. **NLI верификация** - модель roberta-large-mnli оценивает, насколько доказательства подтверждают утверждение
-4. **Классификация** - на основе confidence score выдается вердикт:
-   - `support >= 0.85` → "правда"
-   - `0.4 <= support < 0.85` → "нейтрально"
-   - `support < 0.4` → "неправда"
-
-## Установка
-
-### Требования
-
-- **Python 3.9-3.13** (рекомендуется 3.13.1)
-  - ⚠️ Python 3.14 не поддерживается из-за несовместимости с transformers
-  - Python 3.8 и ниже не поддерживаются
-- 2.5-3GB RAM
-- 2.5GB свободного места на диске
-
-### Шаги установки
-
-1. Клонируйте репозиторий:
 ```bash
-git clone https://github.com/yourusername/IS-hallucination-detection.git
-cd IS-hallucination-detection
-```
-
-2. Создайте виртуальное окружение и установите зависимости:
-```bash
-python3 -m venv venv
+# 1. Activate virtual environment (ВАЖНО!)
 source venv/bin/activate
-pip install -r requirements.txt
+
+# 2. (First time only) Build Knowledge Base
+python scripts/build_kb.py
+
+# 3. Start the server
+./run.sh
+
+# 4. Open browser
+# http://localhost:8000
 ```
 
-3. Постройте базу знаний из Wikipedia (выполняется один раз, ~5-10 минут):
+**ВАЖНО**: Все команды Python должны выполняться с активированным виртуальным окружением!
+
+---
+
+## ✨ Features
+
+### Web Interface (NEW!)
+- 🎨 Modern, responsive web UI
+- 📚 Browse 18 Wikipedia topics across 4 categories
+- 🔍 Real-time fact classification
+- 📊 Detailed results with evidence from Wikipedia
+- ✅ Comprehensive error handling
+
+### API Features
+- 🧠 Natural Language Inference (RoBERTa-large-mnli)
+- 🔎 FAISS vector search for evidence retrieval
+- 📝 Automatic claim extraction from text
+- 🌐 265 Wikipedia articles in Knowledge Base
+- 🚦 Rate limiting (10 req/min)
+- 💾 Response caching (5-minute TTL)
+- 🔒 XSS validation and input sanitization
+
+---
+
+## 🔧 Installation
+
+### Prerequisites
+
+- Python 3.9-3.13 (recommended: 3.13.1)
+- pip
+- Virtual environment (venv)
+
+### Step-by-Step Setup
+
 ```bash
+# 1. Clone the repository
+git clone <repository-url>
+cd IS-hallucination-detection
+
+# 2. Create virtual environment
+python3 -m venv venv
+
+# 3. Activate virtual environment
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# 4. Install dependencies
+pip install -r requirements.txt
+
+# 5. Build Knowledge Base (takes 2-5 minutes)
 python scripts/build_kb.py
 ```
 
-## Запуск
+**Verification**: After successful setup, these files should exist:
+- `data/faiss_index/wikipedia.index` (FAISS index, ~400KB)
+- `data/kb_snippets.json` (metadata, ~145KB)
 
-### Быстрый старт
+---
 
+## 🎯 Usage
+
+### Web Interface
+
+1. **Start the server**:
+   ```bash
+   source venv/bin/activate  # Always activate first!
+   ./run.sh
+   ```
+
+2. **Open browser**:
+   ```
+   http://localhost:8000
+   ```
+
+3. **Use the interface**:
+   - Browse available topics (People, Technology, Science, History & Geography)
+   - Click a topic to insert an example fact
+   - Enter your own text (10-5000 characters)
+   - Click "Classify Text"
+   - View results with evidence
+
+**Expected behavior**:
+- First request: 5-10 seconds (models loading)
+- Subsequent requests: 3-5 seconds (models cached)
+- Green status indicator: API Ready
+- Red status indicator: Models loading or error
+
+### API Usage
+
+#### Health Check
 ```bash
-./run.sh
+curl http://localhost:8000/api/v1/health
 ```
 
-Или вручную:
-```bash
-source venv/bin/activate
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-API будет доступен по адресу:
-- **API**: http://localhost:8000
-- **Документация (Swagger UI)**: http://localhost:8000/docs
-- **Health check**: http://localhost:8000/api/v1/health
-
-## Использование API
-
-### Классификация текста
-
-**Endpoint:** `POST /api/v1/classify`
-
-**Пример запроса:**
-```bash
-curl -X POST "http://localhost:8000/api/v1/classify" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "text": "Albert Einstein was born in 1879. Python is a statically typed language."
-  }'
-```
-
-**Пример ответа:**
-```json
-{
-  "overall_classification": "неправда",
-  "confidence": 0.85,
-  "claims": [
-    {
-      "claim": "Albert Einstein was born in 1879.",
-      "classification": "правда",
-      "confidence": 0.99,
-      "best_evidence": {
-        "snippet": "Albert Einstein was born in Ulm, in the Kingdom of Württemberg in the German Empire, on 14 March 1879.",
-        "source": "https://en.wikipedia.org/wiki/Albert_Einstein",
-        "nli_score": 0.99,
-        "retrieval_score": 0.98
-      }
-    },
-    {
-      "claim": "Python is a statically typed language.",
-      "classification": "неправда",
-      "confidence": 0.92,
-      "best_evidence": {
-        "snippet": "Python uses dynamic typing and a combination of reference counting...",
-        "source": "https://en.wikipedia.org/wiki/Python_(programming_language)",
-        "nli_score": 0.08,
-        "retrieval_score": 0.95
-      }
-    }
-  ]
-}
-```
-
-### Health Check
-
-**Endpoint:** `GET /api/v1/health`
-
-```bash
-curl "http://localhost:8000/api/v1/health"
-```
-
-**Ответ:**
+Response:
 ```json
 {
   "status": "healthy",
@@ -131,155 +120,277 @@ curl "http://localhost:8000/api/v1/health"
 }
 ```
 
-### Cache Statistics
-
-**Endpoint:** `GET /cache-info`
-
+#### Classify Text
 ```bash
-curl "http://localhost:8000/cache-info"
+curl -X POST http://localhost:8000/api/v1/classify \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Albert Einstein was born in 1879 and won the Nobel Prize in Physics."}'
 ```
 
-**Ответ:**
+Response:
 ```json
 {
-  "size": 15,
-  "maxsize": 100
+  "overall_classification": "правда",
+  "confidence": 0.95,
+  "claims": [
+    {
+      "claim": "Albert Einstein was born in 1879.",
+      "classification": "правда",
+      "confidence": 0.99,
+      "best_evidence": {
+        "snippet": "Albert Einstein was born in Ulm...",
+        "source": "https://en.wikipedia.org/wiki/Albert_Einstein",
+        "nli_score": 0.99,
+        "retrieval_score": 0.98
+      }
+    }
+  ]
 }
 ```
 
-## Security Features
-
-### Rate Limiting
-
-API endpoints are protected with rate limiting to prevent abuse:
-- **Library**: slowapi (token bucket algorithm)
-- **Default limit**: 10 requests per minute per IP
-- **Burst allowance**: 3 additional requests
-- **Applies to**: All `/api/v1/*` endpoints
-- **Configuration**: `app/core/config.py` (RATE_LIMIT_REQUESTS, RATE_LIMIT_BURST)
-
-### Input Validation
-
-XSS protection in `app/api/schemas.py`:
-- Detects 10 dangerous patterns: `<script>`, `javascript:`, `onerror=`, `onclick=`, `<iframe>`, `<object>`, `<embed>`, `eval()`, `document.cookie`, `window.location`
-- Minimum text length: 10 characters (approximately 3 words)
-- Returns **422 Validation Error** on XSS attempt
-
-### Exception Handling
-
-8 custom exceptions in `app/core/exceptions.py`:
-- `ModelNotLoadedException` - Models not loaded (503)
-- `KnowledgeBaseException` - KB not found (503)
-- `ClaimExtractionException` - Claim extraction failed (500)
-- `EvidenceRetrievalException` - Evidence retrieval failed (500)
-- `NLIVerificationException` - NLI verification failed (500)
-- `ClassificationException` - Classification failed (500)
-- `CacheException` - Cache operation failed (500)
-
-### Caching
-
-Response caching for improved performance:
-- **Library**: cachetools.TTLCache
-- **TTL**: 5 minutes
-- **Max size**: 100 entries
-- **Key**: MD5 hash of input text
-- **Implementation**: `app/core/cache.py`
-- **Cache info endpoint**: `GET /cache-info` for statistics
-
-## Testing
-
-This project includes comprehensive test coverage with unit and integration tests.
-
-### Running Tests
-
-**Unit Tests** (fast, use mocks):
+#### Get Available Topics
 ```bash
-# All unit tests
-pytest tests/unit -m unit -v
-
-# With coverage report
-pytest tests/unit -m unit --cov=app --cov-report=html
-
-# Specific test file
-pytest tests/unit/test_config.py -v
+curl http://localhost:8000/api/v1/topics
 ```
 
-**Integration Tests** (slow, use real models):
+---
+
+## 🔍 Troubleshooting
+
+### 1. ModuleNotFoundError: sentence_transformers
+
+**Причина**: Виртуальное окружение не активировано
+
+**Решение**:
 ```bash
-# Build Knowledge Base first (required)
-python scripts/build_kb.py
-
-# Run integration tests
-pytest tests/integration -m integration -v
-
-# Skip slow tests
-pytest tests/integration -m "integration and not slow" -v
+source venv/bin/activate
+python scripts/build_kb.py  # Now it will work
 ```
 
-**All Tests:**
+### 2. Network Error on Classify Button
+
+**Причина**: API сервер не запущен
+
+**Решение**:
 ```bash
-pytest tests/ -v --cov=app --cov-report=term-missing
+source venv/bin/activate
+./run.sh  # Start the server
 ```
 
-### Test Structure
+Дождитесь сообщения:
+```
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+✓ Models loaded successfully
+```
 
-- `tests/unit/` - 90 unit tests with mocks (fast, ~5s)
-  - test_config.py: Configuration validation (7 tests)
-  - test_models.py: ModelManager singleton (12 tests)
-  - test_claim_extractor.py: Claim extraction (16 tests)
-  - test_evidence_retriever.py: FAISS retrieval (16 tests)
-  - test_nli_verifier.py: NLI scoring (18 tests)
-  - test_classifier.py: Classification logic (21 tests)
+### 3. Models Not Loaded (503 Error)
 
-- `tests/integration/` - 16 integration tests with real models (slow, ~60s)
-  - test_classification_pipeline.py: End-to-end classification (4 tests)
-  - test_api_endpoints.py: API routes testing (12 tests)
+**Причина**: Модели еще загружаются (первый запуск)
 
-- `tests/conftest.py` - Shared fixtures (mock_model_manager, real_model_manager, etc.)
+**Решение**: Подождите 5-10 секунд после запуска сервера. Модели загружаются автоматически.
 
-### Coverage
+### 4. Knowledge Base Missing
 
-- Target: >= 85% for service layer
-- Current: ~90% for app/services/, ~95% for app/core/
+**Причина**: `data/faiss_index/wikipedia.index` не существует
 
-## Структура проекта
+**Решение**:
+```bash
+source venv/bin/activate
+python scripts/build_kb.py  # Rebuild KB (2-5 minutes)
+```
+
+### 5. Rate Limit Exceeded (429 Error)
+
+**Причина**: Превышен лимит 10 запросов в минуту
+
+**Решение**: Подождите 60 секунд или перезапустите сервер
+
+### 6. Port 8000 Already in Use
+
+**Причина**: Другой процесс использует порт 8000
+
+**Решение**:
+```bash
+# Find and kill the process
+kill $(lsof -t -i:8000)
+
+# Then restart
+./run.sh
+```
+
+---
+
+## 🧪 Testing
+
+### Unit Tests (90 tests, ~5 seconds)
+```bash
+source venv/bin/activate
+pytest tests/unit -m unit
+```
+
+### Integration Tests (16 tests, ~60 seconds)
+```bash
+source venv/bin/activate
+pytest tests/integration -m integration
+```
+
+### All Tests with Coverage
+```bash
+source venv/bin/activate
+pytest tests/ --cov=app --cov-report=html
+```
+
+---
+
+## 📁 Project Structure
 
 ```
 IS-hallucination-detection/
 ├── app/
-│   ├── api/              # API endpoints и схемы
-│   ├── core/             # Конфигурация и управление моделями
-│   ├── services/         # Бизнес-логика (извлечение, поиск, верификация)
-│   └── utils/            # Утилиты (построение KB)
-├── scripts/              # Скрипты (build_kb.py)
-├── tests/                # Тесты
-├── data/                 # FAISS индекс и метаданные KB (создается автоматически)
-├── models/               # Кэш ML моделей (создается автоматически)
-├── requirements.txt      # Python зависимости
-└── run.sh               # Скрипт запуска
+│   ├── main.py                    # FastAPI application
+│   ├── api/
+│   │   ├── routes.py              # API endpoints (/classify, /health, /topics)
+│   │   └── schemas.py             # Pydantic models
+│   ├── core/
+│   │   ├── config.py              # Configuration
+│   │   ├── models.py              # ModelManager singleton
+│   │   ├── cache.py               # Response caching
+│   │   └── exceptions.py          # Custom exceptions
+│   ├── services/
+│   │   ├── claim_extractor.py    # Extract claims from text
+│   │   ├── evidence_retriever.py # FAISS search
+│   │   ├── nli_verifier.py       # NLI scoring
+│   │   └── classifier.py         # Main classification logic
+│   ├── utils/
+│   │   └── wikipedia_kb.py       # KB building utilities
+│   └── static/                    # Frontend files (NEW!)
+│       ├── index.html             # Main UI
+│       ├── css/styles.css         # Responsive design
+│       └── js/
+│           ├── api.js             # API client
+│           ├── ui.js              # UI controller
+│           └── app.js             # Main logic
+├── scripts/
+│   └── build_kb.py                # Build Knowledge Base
+├── tests/
+│   ├── unit/                      # 90 unit tests
+│   └── integration/               # 16 integration tests
+├── data/
+│   ├── faiss_index/               # FAISS vector index
+│   └── kb_snippets.json           # KB metadata
+├── requirements.txt               # Python dependencies
+├── run.sh                         # Startup script
+└── README.md                      # This file
 ```
 
-## Конфигурация
+---
 
-Параметры можно настроить через переменные окружения (см. `.env.example`):
+## ⚙️ Configuration
 
-- `TRUTH_THRESHOLD` - порог для классификации как "правда" (default: 0.85)
-- `FALSEHOOD_THRESHOLD` - порог для классификации как "неправда" (default: 0.4)
-- `TOP_K_PROOFS` - количество доказательств для проверки (default: 6)
-- `MAX_CLAIMS` - максимум утверждений для извлечения (default: 8)
+Configuration is managed via `app/core/config.py`:
 
-## Технологии
+### Model Configuration
+- `EMBED_MODEL`: `all-MiniLM-L6-v2` (sentence embeddings)
+- `NLI_MODEL`: `roberta-large-mnli` (NLI scoring)
 
-- **FastAPI** (0.123.5) - веб-фреймворк для API
-- **sentence-transformers** (3.4.1, all-MiniLM-L6-v2) - векторные представления текста
-- **transformers** (4.57.3, roberta-large-mnli) - NLI модель для верификации
-- **FAISS** (1.13.0) - векторный поиск
-- **Wikipedia API** (1.4.0) - база знаний
-- **NumPy** (2.3.5) - математические операции
-- **PyTorch** (2.9.1) - deep learning framework
-- **slowapi** (0.1.9) - rate limiting
-- **cachetools** (6.2.2) - response caching
+### Classification Thresholds
+- `TRUTH_THRESHOLD`: 0.85 (>= 85% confidence = правда)
+- `FALSEHOOD_THRESHOLD`: 0.4 (< 40% confidence = неправда)
 
-## Лицензия
+### Retrieval Settings
+- `TOP_K_PROOFS`: 6 (retrieve top 6 evidence snippets)
+- `MAX_CLAIMS`: 8 (max claims to extract)
 
-См. файл LICENSE
+### API Settings
+- `RATE_LIMIT_REQUESTS`: 10 (requests per minute)
+- `CACHE_TTL`: 300 seconds (5 minutes)
+- `CACHE_MAX_SIZE`: 100 entries
+
+---
+
+## 📖 How It Works
+
+### Architecture Overview
+
+```
+User Input (English text)
+    ↓
+1. Claim Extraction
+   - Split text into sentences
+   - Extract factual claims
+    ↓
+2. Evidence Retrieval
+   - FAISS vector search
+   - Find top 6 relevant Wikipedia snippets
+    ↓
+3. NLI Verification
+   - RoBERTa-large-mnli model
+   - Score claim-evidence entailment
+    ↓
+4. Classification
+   - Aggregate NLI scores
+   - Apply thresholds (0.85/0.4)
+   - Return verdict: правда/неправда/нейтрально
+```
+
+### Classification Logic
+
+**Per-claim scoring:**
+- `support >= 0.85` → "правда" (high confidence)
+- `0.4 <= support < 0.85` → "нейтрально" (uncertain)
+- `support < 0.4` → "неправда" (contradicts evidence)
+
+**Overall aggregation** (pessimistic):
+- ANY claim "неправда" → overall "неправда"
+- Else, ANY claim "нейтрально" → overall "нейтрально"
+- Else → overall "правда"
+
+---
+
+## 🤝 Contributing
+
+This is a university project for "Технологии проектирования и сопровождения информационных систем".
+
+**Course**: Information Systems Design and Maintenance Technologies
+**University**: [Your University Name]
+**Year**: 2025
+
+---
+
+## 📞 Support
+
+For issues, please check:
+1. [Troubleshooting](#troubleshooting) section above
+2. Server logs (`uvicorn` output in terminal)
+3. Browser console (F12) for frontend errors
+
+---
+
+## 🔗 Additional Resources
+
+- **API Documentation**: http://localhost:8000/docs (Swagger UI)
+- **Health Check**: http://localhost:8000/api/v1/health
+- **Frontend**: http://localhost:8000
+- **Project Documentation**: See `CLAUDE.md` for detailed architecture
+
+---
+
+## 📝 Recent Updates
+
+### Version 2.0 (Current)
+- ✅ Added web interface (HTML/CSS/JavaScript)
+- ✅ 18 Wikipedia topics with examples
+- ✅ Improved error handling with clear messages
+- ✅ Environment checks in build scripts
+- ✅ Better startup experience
+
+### Version 1.0
+- ✅ REST API with FastAPI
+- ✅ NLI-based fact verification
+- ✅ FAISS vector search
+- ✅ Wikipedia knowledge base
+- ✅ Comprehensive testing (106 tests)
+
+---
+
+**Made with ❤️ for accurate fact verification**

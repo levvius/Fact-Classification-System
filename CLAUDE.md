@@ -30,6 +30,120 @@ The system is a **stateless FastAPI application** with the following pipeline:
   - Per-claim: support >= 0.85 → "правда", < 0.4 → "неправда", else "нейтрально"
   - Overall: ANY "неправда" → overall "неправда" (pessimistic aggregation)
 
+## Frontend Architecture (NEW)
+
+The system now includes a **web interface** served via FastAPI StaticFiles:
+
+- **Location**: `app/static/`
+- **Technology**: Vanilla HTML/CSS/JavaScript (zero build tools)
+- **Entry Point**: `app/static/index.html`
+- **API Integration**: Same-origin requests to `/api/v1/*` (no CORS issues)
+
+### Frontend Structure
+
+```
+app/static/
+├── index.html              # Main UI structure
+├── css/
+│   └── styles.css          # Responsive design with gradient header
+└── js/
+    ├── api.js              # APIClient class - fetch wrapper with error handling
+    ├── ui.js               # UIController class - DOM manipulation
+    └── app.js              # Main application logic and initialization
+```
+
+### Frontend Features
+
+1. **Topics Display** (18 topics in 4 categories)
+   - People: Albert Einstein, Barack Obama
+   - Technology: AI, ML, Python, Linux, Microsoft, Google, Tesla, Amazon
+   - Science: Quantum mechanics, Climate change, COVID-19
+   - History & Geography: WWII, New York, Mount Everest
+
+2. **Interactive Input**
+   - Real-time character counter (10-5000 chars)
+   - Click topic cards to insert example facts
+   - Client-side validation with visual feedback
+
+3. **Classification Results**
+   - Overall classification badge (правда/неправда/нейтрально)
+   - Confidence bar (0-100%)
+   - Expandable claims with evidence
+   - Wikipedia source links
+   - NLI and retrieval scores
+
+4. **Error Handling**
+   - 429 Rate Limit: Display countdown timer
+   - 422 Validation: Show specific validation errors
+   - 503 Models Loading: Retry suggestion with instructions
+   - Network: Clear step-by-step server startup instructions
+
+5. **Health Status**
+   - Real-time API health indicator (green/red/yellow)
+   - Periodic health checks (every 30 seconds)
+   - Clear status messages
+
+### Accessing the Frontend
+
+```bash
+# Start the server
+./run.sh
+
+# Navigate to:
+http://localhost:8000
+```
+
+The root endpoint (`GET /`) now serves `index.html` if it exists, or falls back to API info.
+
+### Frontend API Endpoints
+
+All endpoints are accessed via `/api/v1/`:
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/` | GET | Serve frontend UI |
+| `/api/v1/health` | GET | Health check (models status, KB size) |
+| `/api/v1/classify` | POST | Classify text (main endpoint) |
+| `/api/v1/topics` | GET | Get available Wikipedia topics |
+| `/api/v1/cache-info` | GET | Cache statistics (debugging) |
+| `/docs` | GET | Swagger UI (auto-generated) |
+
+### Frontend Error Flow
+
+```
+User clicks "Classify Text"
+    ↓
+api.classifyText(text) → fetch POST /api/v1/classify
+    ↓
+Response handling:
+    ├─ 200 OK → ui.renderResults(result)
+    ├─ 429 Rate Limit → Show "Wait 60s" message
+    ├─ 422 Validation → Show validation errors
+    ├─ 503 Not Ready → Show "Models loading" + retry
+    └─ Network Error (Failed to fetch) → Show detailed server startup instructions
+```
+
+### Development Notes
+
+**No Build Tools Required:**
+- Pure HTML/CSS/JavaScript (ES6+)
+- No npm, webpack, or bundlers
+- Changes are reflected immediately (browser refresh)
+
+**Same-Origin Policy:**
+- Frontend served from same domain as API
+- No CORS configuration needed
+- Fetch requests use relative URLs (`/api/v1/...`)
+
+**Browser Compatibility:**
+- Modern browsers (Chrome 90+, Firefox 88+, Safari 14+)
+- Requires ES6+ support (Fetch API, async/await, classes)
+
+**Debugging:**
+- Open DevTools (F12) → Console for JavaScript errors
+- Network tab for API requests/responses
+- Error banner shows user-friendly messages
+
 ## Common Commands
 
 ### First-time Setup
