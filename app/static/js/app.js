@@ -128,6 +128,13 @@ function handleClassificationError(error) {
     console.error('Classification error:', error);
 
     switch (error.type) {
+        case 'server-offline':
+            ui.showError(
+                `🔴 API Server Not Running\n\n${error.message}\n\n${error.suggestion}`,
+                'server-offline'
+            );
+            break;
+
         case 'rate-limit':
             ui.showError(
                 `⚠️ ${error.message}\n\nYou can make 10 requests per minute. Please wait before trying again.`,
@@ -144,7 +151,7 @@ function handleClassificationError(error) {
 
         case 'not-ready':
             ui.showError(
-                `⏳ ${error.message}\n\nThe classification models are still initializing. This usually takes 5-10 seconds after server startup.`,
+                `⏳ ${error.message}\n\n${error.suggestion || 'Please wait a moment and try again.'}`,
                 'not-ready'
             );
             // Retry health check after 5 seconds
@@ -153,14 +160,14 @@ function handleClassificationError(error) {
 
         case 'server-error':
             ui.showError(
-                `🔴 Server Error: ${error.message}\n\nPlease try again or contact support if the problem persists.`,
+                `🔴 Server Error (${error.status || 'Unknown'}): ${error.message}\n\nPlease check the server logs or try again.`,
                 'server-error'
             );
             break;
 
         case 'network':
             ui.showError(
-                `🌐 Network Error: ${error.message}\n\nPlease check your internet connection and try again.`,
+                `🌐 Network Error: ${error.message}`,
                 'network'
             );
             break;

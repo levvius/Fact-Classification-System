@@ -87,6 +87,11 @@ async def startup_event():
         mm = ModelManager.get_instance()
         mm.load_models()
         logger.info("✓ Models loaded successfully")
+        logger.info("=" * 60)
+        logger.info("  📡 API Documentation: http://localhost:8000/docs")
+        logger.info("  🌐 Web Interface:     http://localhost:8000")
+        logger.info("  ❤️  Health Check:      http://localhost:8000/api/v1/health")
+        logger.info("=" * 60)
     except Exception as e:
         logger.error(f"✗ Failed to load models: {str(e)}", exc_info=True)
         raise

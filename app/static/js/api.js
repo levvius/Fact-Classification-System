@@ -98,14 +98,16 @@ class APIClient {
                 if (response.status === 503) {
                     throw {
                         type: 'not-ready',
-                        message: 'Models are still loading. Please wait a few seconds and try again.'
+                        message: 'Models are still loading. Please wait 5-10 seconds and try again.',
+                        suggestion: 'The API server may have just started. Models typically take 5-10 seconds to initialize.'
                     };
                 }
 
                 // Generic server error
                 throw {
                     type: 'server-error',
-                    message: errorData.message || `Server error: ${response.status}`
+                    message: errorData.message || `Server error: ${response.status}`,
+                    status: response.status
                 };
             }
 
@@ -116,8 +118,18 @@ class APIClient {
                 throw error;
             }
 
-            // Network error or other issues
+            // Network error - API server likely not running
             console.error('Classification error:', error);
+
+            // Check if it's a connection refused error
+            if (error.message && error.message.includes('Failed to fetch')) {
+                throw {
+                    type: 'server-offline',
+                    message: 'Cannot connect to API server',
+                    suggestion: 'Please ensure the API server is running:\n\n1. Open a terminal\n2. Navigate to the project directory\n3. Run: ./run.sh\n4. Wait for "Uvicorn running on http://0.0.0.0:8000"\n5. Then try again'
+                };
+            }
+
             throw {
                 type: 'network',
                 message: 'Network error. Please check your connection and try again.',
