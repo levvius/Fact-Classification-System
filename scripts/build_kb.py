@@ -22,7 +22,7 @@ from app.core.config import settings
 
 def main():
     print("Building Knowledge Base from Wikipedia...")
-    print(f"Using {len(settings.max_sentences_per_page)} sentences per page")
+    print(f"Using {settings.max_sentences_per_page} sentences per page")
 
     # Build KB snippets from Wikipedia
     print("\nFetching Wikipedia pages...")
