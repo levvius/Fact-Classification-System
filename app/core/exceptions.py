@@ -107,3 +107,14 @@ class KnowledgeBaseException(AppBaseException):
 
     def __init__(self, message: str = "Failed to load or access knowledge base", details: Optional[Dict[str, Any]] = None):
         super().__init__(message=message, details=details, status_code=503)
+
+
+class CacheException(AppBaseException):
+    """
+    Raised when cache operations fail.
+
+    HTTP Status: 500 Internal Server Error
+    """
+
+    def __init__(self, message: str = "Cache operation failed", details: Optional[Dict[str, Any]] = None):
+        super().__init__(message=message, details=details, status_code=500)

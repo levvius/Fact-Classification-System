@@ -8,6 +8,53 @@ import sys
 import json
 from pathlib import Path
 
+
+def check_environment():
+    """Check if virtual environment is activated and dependencies are available."""
+    # Check if running in virtual environment
+    in_venv = hasattr(sys, 'real_prefix') or (
+        hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix
+    )
+
+    if not in_venv:
+        print("❌ ERROR: Virtual environment is not activated!")
+        print("\nPlease activate the virtual environment first:")
+        print("  source venv/bin/activate")
+        print("\nThen run this script again:")
+        print("  python scripts/build_kb.py")
+        sys.exit(1)
+
+    # Check required packages
+    missing_packages = []
+    try:
+        import sentence_transformers
+    except ImportError:
+        missing_packages.append('sentence-transformers')
+
+    try:
+        import faiss
+    except ImportError:
+        missing_packages.append('faiss-cpu')
+
+    try:
+        import wikipedia
+    except ImportError:
+        missing_packages.append('wikipedia')
+
+    try:
+        import tqdm
+    except ImportError:
+        missing_packages.append('tqdm')
+
+    if missing_packages:
+        print(f"❌ ERROR: Missing required packages: {', '.join(missing_packages)}")
+        print("\nPlease install dependencies:")
+        print("  pip install -r requirements.txt")
+        sys.exit(1)
+
+    print("✓ Environment check passed")
+
+
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -21,6 +68,8 @@ from app.core.config import settings
 
 
 def main():
+    # Check environment first
+    check_environment()
     print("Building Knowledge Base from Wikipedia...")
     print(f"Using {settings.max_sentences_per_page} sentences per page")
 

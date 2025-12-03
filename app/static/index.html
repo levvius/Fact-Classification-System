@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fact Classification System</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Fact Classification System</h1>
+            <p class="subtitle">Verify facts using Natural Language Inference and Wikipedia</p>
+            <div id="health-status" class="health-status">
+                <span id="status-indicator" class="status-indicator">●</span>
+                <span id="status-text">Checking API...</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- Topics Display Section -->
+        <section id="topics-section" class="topics-section">
+            <h2>Available Wikipedia Topics</h2>
+            <p class="section-description">Click on a topic to see an example fact</p>
+            <div id="topics-container" class="topics-container">
+                <!-- Topics will be dynamically loaded here -->
+            </div>
+        </section>
+
+        <!-- Input Form Section -->
+        <section id="input-section" class="input-section">
+            <h2>Enter Text to Classify</h2>
+            <p class="section-description">Enter English text (minimum 10 characters, maximum 5000)</p>
+            <form id="classify-form" class="classify-form">
+                <textarea
+                    id="text-input"
+                    class="text-input"
+                    placeholder="Enter English text to classify (e.g., 'Albert Einstein was born in 1879 and won the Nobel Prize in Physics.')..."
+                    minlength="10"
+                    maxlength="5000"
+                    required
+                    rows="6"></textarea>
+                <div class="input-footer">
+                    <span id="char-counter" class="char-counter">0 / 5000</span>
+                    <button type="submit" id="submit-btn" class="submit-btn" disabled>
+                        Classify Text
+                    </button>
+                </div>
+            </form>
+        </section>
+
+        <!-- Results Display Section -->
+        <section id="results-section" class="results-section" style="display: none;">
+            <h2>Classification Results</h2>
+            <div id="overall-result" class="overall-result"></div>
+            <div id="claims-list" class="claims-list"></div>
+        </section>
+
+        <!-- Error Display -->
+        <div id="error-banner" class="error-banner" style="display: none;">
+            <span id="error-message"></span>
+            <button id="error-close" class="error-close">&times;</button>
+        </div>
+    </main>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay" style="display: none;">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <p>Analyzing text...</p>
+            <p class="loading-subtitle">This may take 5-10 seconds</p>
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>
+                Rate limit: 10 requests/minute |
+                <a href="/docs" target="_blank">API Documentation</a> |
+                <a href="/api/v1/health" target="_blank">Health Check</a>
+            </p>
+            <p class="footer-note">
+                Powered by RoBERTa NLI and Wikipedia Knowledge Base
+            </p>
+        </div>
+    </footer>
+
+    <!-- JavaScript files -->
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/ui.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

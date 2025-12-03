@@ -30,6 +30,191 @@ The system is a **stateless FastAPI application** with the following pipeline:
   - Per-claim: support >= 0.85 → "правда", < 0.4 → "неправда", else "нейтрально"
   - Overall: ANY "неправда" → overall "неправда" (pessimistic aggregation)
 
+## Stability & Performance (macOS Critical)
+
+### Single-Threaded Mode (REQUIRED on macOS)
+
+The system MUST run in single-threaded mode on macOS to prevent segmentation faults:
+
+**File:** `app/core/models.py:47-55`
+```python
+# CRITICAL: Single-threaded mode to prevent threading crashes on macOS
+torch.set_num_threads(1)
+torch.set_num_interop_threads(1)
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
+logger.info("PyTorch threads limited to 1 (single-threaded mode for stability)")
+```
+
+**Why:** PyTorch multi-threading causes crashes with roberta-large-mnli (355M parameters) on Apple Silicon.
+
+### ThreadPoolExecutor Pattern
+
+**File:** `app/api/routes.py:26-80`
+
+ML operations run in dedicated thread pool to prevent FastAPI event loop blocking:
+
+```python
+ml_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="ml-worker")
+
+# In endpoint:
+result = await asyncio.wait_for(
+    loop.run_in_executor(ml_executor, classify_text, text),
+    timeout=45.0  # 45-second timeout
+)
+```
+
+**Why:** Synchronous ML operations (NLI, FAISS) would block async FastAPI.
+
+### Device Configuration
+
+**File:** `app/core/models.py:60`
+
+Force CPU-only mode to prevent MPS GPU crashes:
+
+```python
+self._embed_model = SentenceTransformer(settings.embedding_model, device='cpu')
+```
+
+**Why:** MPS (Metal Performance Shaders) auto-detection causes PyTorch backend crashes.
+
+### Removed Features (Safety)
+
+1. **Signal Handlers** - Removed from `app/main.py`
+   - SIGSEGV/SIGABRT handlers caused infinite recursion
+   - Cannot safely log when memory is corrupted
+
+2. **Uvicorn --reload** - Removed from `run.sh:90`
+   - Process forking incompatible with ML pipeline on macOS
+   - Use manual restarts during development
+
+3. **Progress Bars** - Disabled in `evidence_retriever.py:39`
+   - `show_progress_bar=False` prevents multiprocessing deadlocks
+
+**Impact of Stability Fixes:**
+- ✅ No more segmentation faults on macOS
+- ✅ No more infinite recursion from signal handlers
+- ✅ Stable multi-claim classification
+- ✅ All 106 tests pass reliably
+- ✅ System runs crash-free for extended periods
+
+## Frontend Architecture (NEW)
+
+The system now includes a **web interface** served via FastAPI StaticFiles:
+
+- **Location**: `app/static/`
+- **Technology**: Vanilla HTML/CSS/JavaScript (zero build tools)
+- **Entry Point**: `app/static/index.html`
+- **API Integration**: Same-origin requests to `/api/v1/*` (no CORS issues)
+
+### Frontend Structure
+
+```
+app/static/
+├── index.html              # Main UI structure
+├── css/
+│   └── styles.css          # Responsive design with gradient header
+└── js/
+    ├── api.js              # APIClient class - fetch wrapper with error handling
+    ├── ui.js               # UIController class - DOM manipulation
+    └── app.js              # Main application logic and initialization
+```
+
+### Frontend Features
+
+1. **Topics Display** (18 topics in 4 categories)
+   - People: Albert Einstein, Barack Obama
+   - Technology: AI, ML, Python, Linux, Microsoft, Google, Tesla, Amazon
+   - Science: Quantum mechanics, Climate change, COVID-19
+   - History & Geography: WWII, New York, Mount Everest
+
+2. **Interactive Input**
+   - Real-time character counter (10-5000 chars)
+   - Click topic cards to insert example facts
+   - Client-side validation with visual feedback
+
+3. **Classification Results**
+   - Overall classification badge (правда/неправда/нейтрально)
+   - Confidence bar (0-100%)
+   - Expandable claims with evidence
+   - Wikipedia source links
+   - NLI and retrieval scores
+
+4. **Error Handling**
+   - 429 Rate Limit: Display countdown timer
+   - 422 Validation: Show specific validation errors
+   - 503 Models Loading: Retry suggestion with instructions
+   - Network: Clear step-by-step server startup instructions
+
+5. **Health Status**
+   - Real-time API health indicator (green/red/yellow)
+   - Periodic health checks (every 30 seconds)
+   - Clear status messages
+
+### Accessing the Frontend
+
+```bash
+# Start the server
+./run.sh
+
+# Navigate to:
+http://localhost:8000
+```
+
+The root endpoint (`GET /`) now serves `index.html` if it exists, or falls back to API info.
+
+### Frontend API Endpoints
+
+All endpoints are accessed via `/api/v1/`:
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/` | GET | Serve frontend UI |
+| `/api/v1/health` | GET | Health check (models status, KB size) |
+| `/api/v1/classify` | POST | Classify text (main endpoint) |
+| `/api/v1/topics` | GET | Get available Wikipedia topics |
+| `/api/v1/cache-info` | GET | Cache statistics (debugging) |
+| `/docs` | GET | Swagger UI (auto-generated) |
+
+### Frontend Error Flow
+
+```
+User clicks "Classify Text"
+    ↓
+api.classifyText(text) → fetch POST /api/v1/classify
+    ↓
+Response handling:
+    ├─ 200 OK → ui.renderResults(result)
+    ├─ 429 Rate Limit → Show "Wait 60s" message
+    ├─ 422 Validation → Show validation errors
+    ├─ 503 Not Ready → Show "Models loading" + retry
+    └─ Network Error (Failed to fetch) → Show detailed server startup instructions
+```
+
+### Development Notes
+
+**No Build Tools Required:**
+- Pure HTML/CSS/JavaScript (ES6+)
+- No npm, webpack, or bundlers
+- Changes are reflected immediately (browser refresh)
+
+**Same-Origin Policy:**
+- Frontend served from same domain as API
+- No CORS configuration needed
+- Fetch requests use relative URLs (`/api/v1/...`)
+
+**Browser Compatibility:**
+- Modern browsers (Chrome 90+, Firefox 88+, Safari 14+)
+- Requires ES6+ support (Fetch API, async/await, classes)
+
+**Debugging:**
+- Open DevTools (F12) → Console for JavaScript errors
+- Network tab for API requests/responses
+- Error banner shows user-friendly messages
+
 ## Common Commands
 
 ### First-time Setup
