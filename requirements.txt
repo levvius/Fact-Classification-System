@@ -1,32 +1,39 @@
-fastapi==0.109.0
-uvicorn[standard]==0.27.0
-pydantic==2.5.0
-pydantic-settings==2.1.0
-sentence-transformers==2.3.1
-faiss-cpu==1.13.0
-transformers==4.36.0
-torch==2.1.2
-wikipedia==1.4.0
-numpy==1.26.0
-tqdm==4.66.1
-python-multipart==0.0.6
+# Core Framework
+fastapi>=0.115.0,<1.0.0
+uvicorn[standard]>=0.30.0
+pydantic>=2.9.0,<3.0.0
+pydantic-settings>=2.5.0
+
+# ML Models - Compatible with Python 3.9-3.13
+numpy>=1.26.0,<3.0.0
+torch>=2.2.0,<3.0.0
+transformers>=4.36.0,<5.0.0
+sentence-transformers>=2.3.0,<4.0.0
+
+# Vector Search
+faiss-cpu>=1.7.4,<2.0.0
+
+# Utilities
+wikipedia>=1.4.0
+tqdm>=4.66.0
+python-multipart>=0.0.6
 
 # Testing Framework
-pytest==7.4.3
-pytest-asyncio==0.21.1
-pytest-cov==4.1.0
-pytest-mock==3.12.0
-httpx==0.25.2
-faker==20.1.0
+pytest>=7.4.0,<9.0.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+pytest-mock>=3.12.0
+httpx>=0.25.0
+faker>=20.0.0
 
 # Security & Rate Limiting
-slowapi==0.1.9
-cachetools==5.3.2
+slowapi>=0.1.9
+cachetools>=5.3.0
 
 # Playwright Testing
-playwright==1.40.0
-pytest-playwright==0.4.3
+playwright>=1.40.0
+pytest-playwright>=0.4.0
 
 # Development Tools
-black==23.11.0
-ruff==0.1.6
+black>=23.11.0
+ruff>=0.1.0
