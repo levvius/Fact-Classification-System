@@ -42,6 +42,7 @@ def mock_faiss_index():
     Mock FAISS index for vector similarity search.
 
     Returns distances and indices for top-k search results.
+    Returns all 6 KB snippets to match the mock_kb_snippets fixture.
     """
     mock = Mock()
     # Return: (distances, indices)

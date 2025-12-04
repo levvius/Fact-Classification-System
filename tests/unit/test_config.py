@@ -5,10 +5,14 @@ from app.core.config import settings
 @pytest.mark.unit
 def test_default_settings():
     """Test that default configuration values are correct."""
-    assert settings.truth_threshold == 0.85
+    assert settings.truth_threshold == 0.75  # Updated from 0.85
     assert settings.falsehood_threshold == 0.4
-    assert settings.top_k_proofs == 6
+    assert settings.top_k_proofs == 10  # Updated from 6
     assert settings.max_claims == 8
+    # New feature flags
+    assert settings.use_weighted_aggregation == True
+    assert settings.neutral_vote_weight == 0.5
+    assert settings.use_nli_context == True
 
 
 @pytest.mark.unit

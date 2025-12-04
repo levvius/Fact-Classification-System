@@ -15,12 +15,19 @@ class Settings(BaseSettings):
     device: str = "cpu"  # or "cuda" for GPU
 
     # Classification Thresholds
-    truth_threshold: float = 0.85  # support >= 0.85 -> "правда"
+    truth_threshold: float = 0.75  # support >= 0.75 -> "правда" (lowered from 0.85)
     falsehood_threshold: float = 0.4  # support < 0.4 -> "неправда"
 
     # Evidence Retrieval
-    top_k_proofs: int = 6
+    top_k_proofs: int = 10  # increased from 6 for better evidence quality
     max_claims: int = 8
+
+    # Aggregation Strategy
+    use_weighted_aggregation: bool = True  # weighted voting vs pessimistic aggregation
+    neutral_vote_weight: float = 0.5  # weight multiplier for neutral claims (0.0-1.0)
+
+    # NLI Configuration
+    use_nli_context: bool = True  # add "Established fact:" prefix to guide NLI model
 
     # Paths
     project_root: Path = Path(__file__).parent.parent.parent

@@ -102,3 +102,52 @@ def test_classify_neutral_text(real_model_manager):
 
     # At least one claim should be extracted
     assert len(result["claims"]) >= 1
+
+
+@pytest.mark.integration
+@pytest.mark.slow
+def test_classify_einstein_birth_year_with_new_threshold(real_model_manager):
+    """Test that Einstein's birth year classifies as truth with 0.75 threshold.
+
+    This test validates that the lowered threshold (0.85 → 0.75) correctly
+    identifies well-established historical facts as 'правда' instead of 'нейтрально'.
+    """
+    text = "Albert Einstein was born in 1879."
+
+    result = classify_text(text)
+
+    # Should be truth with new threshold
+    assert result["overall_classification"] == "правда"
+    assert result["confidence"] >= 0.70
+    assert len(result["claims"]) >= 1
+
+    # Verify evidence quality
+    claim = result["claims"][0]
+    assert claim["best_evidence"] is not None
+    assert claim["best_evidence"]["nli_score"] >= 0.70
+
+    # Evidence snippet should mention the year 1879
+    evidence_text = claim["best_evidence"]["snippet"]
+    assert "1879" in evidence_text or "Einstein" in evidence_text
+
+
+@pytest.mark.integration
+@pytest.mark.slow
+def test_classify_python_creator_fact(real_model_manager):
+    """Test that Python creator fact classifies as truth.
+
+    This test validates that well-established programming language facts
+    are correctly identified as 'правда' with the improved thresholds.
+    """
+    text = "Python was created by Guido van Rossum in 1991."
+
+    result = classify_text(text)
+
+    # Should be truth
+    assert result["overall_classification"] == "правда"
+    assert result["confidence"] >= 0.65
+    assert len(result["claims"]) >= 1
+
+    # At least one claim should be classified as truth
+    truth_claims = [c for c in result["claims"] if c["classification"] == "правда"]
+    assert len(truth_claims) >= 1

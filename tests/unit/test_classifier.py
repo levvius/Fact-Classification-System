@@ -79,10 +79,10 @@ def test_assess_claim_uses_default_top_k(mock_model_manager):
 
         assess_claim("Test claim")
 
-        # Should call retrieve_proofs with default top_k (6)
+        # Should call retrieve_proofs with default top_k (10, updated from 6)
         mock_retrieve.assert_called_once()
         call_kwargs = mock_retrieve.call_args[1]
-        assert call_kwargs.get("top_k") == 6
+        assert call_kwargs.get("top_k") == 10
 
 
 @pytest.mark.unit
@@ -175,10 +175,11 @@ def test_classify_text_neutral_classification(mock_model_manager):
 
 @pytest.mark.unit
 def test_classify_text_mixed_claims_falsehood_priority(mock_model_manager):
-    """Test that any 'неправда' claim makes overall classification 'неправда'."""
+    """Test that any 'неправда' claim makes overall classification 'неправда' (legacy pessimistic aggregation)."""
     with patch('app.services.classifier.extract_claims') as mock_extract, \
          patch('app.services.classifier.retrieve_proofs') as mock_retrieve, \
-         patch('app.services.classifier.nli_score') as mock_nli:
+         patch('app.services.classifier.nli_score') as mock_nli, \
+         patch('app.core.config.settings.use_weighted_aggregation', False):
 
         # Mock two claims: one true, one false
         mock_extract.return_value = [
@@ -191,7 +192,8 @@ def test_classify_text_mixed_claims_falsehood_priority(mock_model_manager):
         ]
 
         # First claim: high score (truth), second claim: low score (falsehood)
-        mock_nli.side_effect = [0.92, 0.92, 0.15, 0.15]  # 2 calls per claim (retrieve + assess)
+        # One NLI call per claim (1 proof each)
+        mock_nli.side_effect = [0.92, 0.15]
 
         result = classify_text("Mixed text")
 
@@ -202,10 +204,11 @@ def test_classify_text_mixed_claims_falsehood_priority(mock_model_manager):
 
 @pytest.mark.unit
 def test_classify_text_mixed_claims_neutral_priority(mock_model_manager):
-    """Test that 'нейтрально' has priority over 'правда' but not 'неправда'."""
+    """Test that 'нейтрально' has priority over 'правда' but not 'неправда' (legacy pessimistic aggregation)."""
     with patch('app.services.classifier.extract_claims') as mock_extract, \
          patch('app.services.classifier.retrieve_proofs') as mock_retrieve, \
-         patch('app.services.classifier.nli_score') as mock_nli:
+         patch('app.services.classifier.nli_score') as mock_nli, \
+         patch('app.core.config.settings.use_weighted_aggregation', False):
 
         # Mock two claims: one true, one neutral
         mock_extract.return_value = [
@@ -218,7 +221,8 @@ def test_classify_text_mixed_claims_neutral_priority(mock_model_manager):
         ]
 
         # First claim: high score (truth), second claim: medium score (neutral)
-        mock_nli.side_effect = [0.92, 0.92, 0.6, 0.6]
+        # One NLI call per claim (1 proof each)
+        mock_nli.side_effect = [0.92, 0.6]
 
         result = classify_text("Mixed text")
 
@@ -256,10 +260,11 @@ def test_classify_text_multiple_truth_claims(mock_model_manager):
 
 @pytest.mark.unit
 def test_classify_text_confidence_calculation(mock_model_manager):
-    """Test that confidence is calculated correctly."""
+    """Test that confidence is calculated correctly (legacy pessimistic aggregation)."""
     with patch('app.services.classifier.extract_claims') as mock_extract, \
          patch('app.services.classifier.retrieve_proofs') as mock_retrieve, \
-         patch('app.services.classifier.nli_score') as mock_nli:
+         patch('app.services.classifier.nli_score') as mock_nli, \
+         patch('app.core.config.settings.use_weighted_aggregation', False):
 
         mock_extract.return_value = ["Test claim"]
         mock_retrieve.return_value = [
@@ -381,10 +386,11 @@ def test_assess_claim_aggregates_max_score(mock_model_manager):
 
 @pytest.mark.unit
 def test_classify_text_overall_confidence_averaging(mock_model_manager):
-    """Test that overall confidence is averaged correctly for multiple claims."""
+    """Test that overall confidence is averaged correctly for multiple claims (legacy pessimistic aggregation)."""
     with patch('app.services.classifier.extract_claims') as mock_extract, \
          patch('app.services.classifier.retrieve_proofs') as mock_retrieve, \
-         patch('app.services.classifier.nli_score') as mock_nli:
+         patch('app.services.classifier.nli_score') as mock_nli, \
+         patch('app.core.config.settings.use_weighted_aggregation', False):
 
         # Two true claims with different confidences
         mock_extract.return_value = ["Claim 1", "Claim 2"]
@@ -392,11 +398,82 @@ def test_classify_text_overall_confidence_averaging(mock_model_manager):
             {"snippet": "Evidence", "source": "https://example.com", "retrieval_score": 0.1}
         ]
 
-        # Scores: 0.90 and 0.88 (both >= 0.85, so both are truth)
-        mock_nli.side_effect = [0.90, 0.90, 0.88, 0.88]
+        # Scores: 0.90 and 0.88 (both >= 0.75, so both are truth)
+        # One NLI call per claim (1 proof each)
+        mock_nli.side_effect = [0.90, 0.88]
 
         result = classify_text("Two true claims")
 
         # Overall confidence should be average: (0.90 + 0.88) / 2 = 0.89
         assert result["overall_classification"] == "правда"
         assert result["confidence"] == pytest.approx(0.89, rel=0.01)
+
+
+@pytest.mark.unit
+def test_classify_with_lowered_threshold(mock_model_manager):
+    """Test that 0.75 threshold correctly classifies borderline cases as truth."""
+    with patch('app.services.classifier.extract_claims') as mock_extract, \
+         patch('app.services.classifier.retrieve_proofs') as mock_retrieve, \
+         patch('app.services.classifier.nli_score') as mock_nli, \
+         patch('app.core.config.settings.truth_threshold', 0.75), \
+         patch('app.core.config.settings.use_weighted_aggregation', False):
+
+        mock_extract.return_value = ["Einstein was born in 1879."]
+        mock_retrieve.return_value = [
+            {"snippet": "Evidence", "source": "https://example.com", "retrieval_score": 0.1}
+        ]
+        mock_nli.return_value = 0.78  # Between 0.75 and 0.85
+
+        result = classify_text("Einstein was born in 1879.")
+
+        # Should classify as truth with 0.75 threshold (was neutral with 0.85)
+        assert result["overall_classification"] == "правда"
+        assert result["confidence"] == 0.78
+
+
+@pytest.mark.unit
+def test_weighted_aggregation_high_confidence_truth_wins(mock_model_manager):
+    """Test that high-confidence truths override low-confidence falsehood."""
+    with patch('app.services.classifier.extract_claims') as mock_extract, \
+         patch('app.services.classifier.retrieve_proofs') as mock_retrieve, \
+         patch('app.services.classifier.nli_score') as mock_nli, \
+         patch('app.core.config.settings.use_weighted_aggregation', True), \
+         patch('app.core.config.settings.truth_threshold', 0.75):
+
+        mock_extract.return_value = [
+            "Einstein was born in 1879.",
+            "Einstein developed relativity.",
+            "Einstein won many awards."
+        ]
+
+        mock_retrieve.return_value = [
+            {"snippet": "Evidence", "source": "https://example.com", "retrieval_score": 0.1}
+        ]
+
+        # Scores: 0.90 (truth), 0.88 (truth), 0.35 (falsehood)
+        mock_nli.side_effect = [0.90, 0.90, 0.88, 0.88, 0.35, 0.35]
+
+        result = classify_text("Mixed claims")
+
+        # Weighted: truth=1.78, falsehood=0.35 → truth wins
+        assert result["overall_classification"] == "правда"
+        assert result["confidence"] > 0.70
+
+
+@pytest.mark.unit
+def test_nli_with_context_prefix(mock_model_manager):
+    """Test that contextual prefix is applied correctly when enabled."""
+    from app.services.nli_verifier import nli_score
+    from app.core.models import ModelManager
+
+    with patch('app.core.config.settings.use_nli_context', True):
+        mock_nli_pipeline = Mock()
+        mock_nli_pipeline.return_value = [{'label': 'ENTAILMENT', 'score': 0.85}]
+
+        with patch.object(ModelManager.get_instance(), 'get_nli', return_value=mock_nli_pipeline):
+            score = nli_score("Einstein was born in 1879.", "Evidence snippet")
+
+            # Verify context prefix was added
+            call_args = mock_nli_pipeline.call_args[0][0]
+            assert "Established fact:" in call_args
+            assert score == 0.85

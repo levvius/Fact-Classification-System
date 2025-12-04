@@ -52,6 +52,65 @@ def assess_claim(claim: str, top_k: int = None) -> Dict:
     }
 
 
+def aggregate_classifications_weighted(claim_results: List[Dict]) -> tuple[str, float]:
+    """
+    Aggregate claim classifications using confidence-weighted voting.
+
+    Algorithm:
+    1. Weight each classification by confidence score
+    2. Truth vote = sum(confidence * is_truth)
+    3. Falsehood vote = sum(confidence * is_falsehood)
+    4. Neutral vote = sum(confidence * is_neutral) * neutral_weight
+    5. Winner = category with highest weighted vote
+    6. Overall confidence = winner_vote / total_vote
+
+    This prevents single low-confidence claims from overriding
+    multiple high-confidence claims.
+
+    Args:
+        claim_results: List of dicts with 'classification' and 'confidence' keys
+
+    Returns:
+        Tuple of (overall_classification, overall_confidence)
+
+    Raises:
+        ValueError: If claim_results is empty
+    """
+    if not claim_results:
+        raise ValueError("Cannot aggregate empty claim results")
+
+    # Initialize vote counters
+    truth_vote = 0.0
+    falsehood_vote = 0.0
+    neutral_vote = 0.0
+
+    for result in claim_results:
+        classification = result["classification"]
+        confidence = result["confidence"]
+
+        if classification == "правда":
+            truth_vote += confidence
+        elif classification == "неправда":
+            falsehood_vote += confidence
+        else:  # "нейтрально"
+            # Neutral claims get reduced weight (less influential)
+            neutral_vote += confidence * settings.neutral_vote_weight
+
+    # Determine winner
+    total_vote = truth_vote + falsehood_vote + neutral_vote
+
+    votes = {
+        "правда": truth_vote,
+        "неправда": falsehood_vote,
+        "нейтрально": neutral_vote
+    }
+
+    overall = max(votes, key=votes.get)
+    overall_confidence = votes[overall] / total_vote if total_vote > 0 else 0.0
+
+    return overall, overall_confidence
+
+
 def classify_text(text: str) -> Dict:
     """
     Classify text as "правда", "неправда", or "нейтрально".
@@ -124,30 +183,36 @@ def classify_text(text: str) -> Dict:
         # Overall classification aggregation
         logger.info("STEP 4: Aggregating results...")
         sys.stdout.flush()
-        # Priority: if any "неправда" -> overall "неправда"
-        #           elif any "нейтрально" -> overall "нейтрально"
-        #           else -> overall "правда"
-        classifications = [r["classification"] for r in claim_results]
-        confidences = [r["confidence"] for r in claim_results]
 
-        if "неправда" in classifications:
-            overall = "неправда"
-            # Average confidence of falsehood claims
-            falsehood_confidences = [
-                c for c, cl in zip(confidences, classifications) if cl == "неправда"
-            ]
-            overall_confidence = sum(falsehood_confidences) / len(falsehood_confidences)
-        elif "нейтрально" in classifications:
-            overall = "нейтрально"
-            # Average confidence of neutral claims
-            neutral_confidences = [
-                c for c, cl in zip(confidences, classifications) if cl == "нейтрально"
-            ]
-            overall_confidence = sum(neutral_confidences) / len(neutral_confidences)
+        # Use weighted confidence aggregation (new) or pessimistic aggregation (legacy)
+        if settings.use_weighted_aggregation:
+            overall, overall_confidence = aggregate_classifications_weighted(claim_results)
         else:
-            overall = "правда"
-            # Average confidence of truth claims
-            overall_confidence = sum(confidences) / len(confidences) if confidences else 0.0
+            # Legacy pessimistic aggregation
+            # Priority: if any "неправда" -> overall "неправда"
+            #           elif any "нейтрально" -> overall "нейтрально"
+            #           else -> overall "правда"
+            classifications = [r["classification"] for r in claim_results]
+            confidences = [r["confidence"] for r in claim_results]
+
+            if "неправда" in classifications:
+                overall = "неправда"
+                # Average confidence of falsehood claims
+                falsehood_confidences = [
+                    c for c, cl in zip(confidences, classifications) if cl == "неправда"
+                ]
+                overall_confidence = sum(falsehood_confidences) / len(falsehood_confidences)
+            elif "нейтрально" in classifications:
+                overall = "нейтрально"
+                # Average confidence of neutral claims
+                neutral_confidences = [
+                    c for c, cl in zip(confidences, classifications) if cl == "нейтрально"
+                ]
+                overall_confidence = sum(neutral_confidences) / len(neutral_confidences)
+            else:
+                overall = "правда"
+                # Average confidence of truth claims
+                overall_confidence = sum(confidences) / len(confidences) if confidences else 0.0
 
         logger.info(f"STEP 4: ✓ Overall: {overall} (confidence: {overall_confidence:.2f})")
         sys.stdout.flush()
